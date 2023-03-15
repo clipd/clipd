@@ -15,7 +15,7 @@
 
 ```ps1
 scoop bucket add clipd https://github.com/clipd/scoop-buckets
-scopp install clipd
+scoop install clipd
 ```
 
 ### Linux
