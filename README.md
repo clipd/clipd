@@ -7,21 +7,24 @@
 - [x] 自动移除剪切板文本开头的换行符/空白符
 - [x] 自动移除剪切板文本中的 `<CR>`
 - [x] 自动移除剪切板文本末尾的换行符/空白符
+- [ ] 自定义格式化剪切板文本
+- [ ] 自定义监听剪切板复制事件
+- [ ] 多个设备之间共享剪切板数据
 - [ ] 其它功能待续
 
 ## 安装
 
-### Windows
+### Windows (x86_64)
 
 [Releases Page](https://github.com/clipd/clipd/releases/latest)
 
-### Linux
+### 其它平台
 
-开发中
-
-### MacOS
-
-开发中
+- [ ] Android
+- [ ] iOS
+- [ ] Linux
+- [ ] macOS (x86_64 / arm64)
+- [ ] Windows (arm64)
 
 ## License
 
