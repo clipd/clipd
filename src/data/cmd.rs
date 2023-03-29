@@ -34,18 +34,21 @@ pub enum SubCommand {
 }
 
 #[derive(clap::Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
 pub struct RunArgs {
     /// Run as daemon service
     #[clap(short = 'D', long)]
     pub daemon: bool,
 }
 
+#[cfg(target_os = "windows")]
 #[derive(clap::Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 pub struct UninstallArgs {
     /// Timeout waiting for the service to be deleted from the database
     #[clap(short, long, default_value_t = 5)]
-    #[cfg(target_os = "windows")]
     pub timeout: u64,
 }
+
+#[cfg(not(target_os = "windows"))]
+#[derive(clap::Parser, Debug)]
+pub struct UninstallArgs;
