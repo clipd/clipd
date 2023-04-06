@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use windows::{
+    core::PCWSTR,
     Win32::Foundation::*,
     Win32::System::{
         DataExchange::{
@@ -13,20 +14,24 @@ use windows::{
 };
 
 use crate::{
-    fmt::{Formatter, UTF16Formatter},
+    fmt::{FormatFeature, Formatter, StringFormatter},
     os::windows::mem::HandleGuard,
     ExpectWithTracing,
 };
 
 #[derive(Debug)]
 pub struct ClipboardFormatter {
+    utf16_formatter: HANDLE2UTF16Formatter,
     window: HWND,
 }
 
 impl ClipboardFormatter {
     pub fn new(window: HWND) -> Self {
         unsafe { AddClipboardFormatListener(window).expectx("AddClipboardFormatListener") };
-        Self { window }
+        Self {
+            window,
+            utf16_formatter: HANDLE2UTF16Formatter::default(),
+        }
     }
 
     pub fn destroy(&self) {
@@ -43,10 +48,7 @@ impl ClipboardFormatter {
         let clipboard = Clipboard::open(self.window)?;
 
         let text = clipboard.get_text(CF_UNICODETEXT)?;
-        let ptr = GlobalLock(text.0);
-        let formatter = UTF16Formatter::default();
-        let fmt_text = formatter.fmt_c_void(ptr)?;
-        GlobalUnlock(text.0);
+        let fmt_text = self.utf16_formatter.fmt(&text)?;
         clipboard.set_text(CF_UNICODETEXT, fmt_text)?;
 
         Ok(())
@@ -112,5 +114,41 @@ impl Clipboard {
 impl Drop for Clipboard {
     fn drop(&mut self) {
         unsafe { CloseClipboard() };
+    }
+}
+
+#[derive(Debug)]
+struct HANDLE2UTF16Formatter {
+    inner: StringFormatter,
+}
+
+impl Formatter<HANDLE, Vec<u16>> for HANDLE2UTF16Formatter {
+    fn new(feature: FormatFeature) -> Result<Self> {
+        Ok(Self {
+            inner: StringFormatter::new(feature)?.ends_with_zero(),
+        })
+    }
+
+    fn fmt(&self, text: &HANDLE) -> Result<Vec<u16>> {
+        let hmem = text.0;
+        let ptr = unsafe { GlobalLock(hmem) };
+        let text = PCWSTR::from_raw(ptr as _);
+        unsafe {
+            log::trace!("{:?}", text.to_string());
+        }
+        log::trace!("{:?}", self.inner);
+        let text = unsafe { text.to_string()? };
+        let fmt_text = self.inner.fmt(&text)?;
+        log::trace!("{:?}", fmt_text);
+        unsafe { GlobalUnlock(hmem) };
+        let b = fmt_text.encode_utf16().collect::<Vec<u16>>();
+        log::trace!("{:?}", b);
+        Ok(b)
+    }
+}
+
+impl Default for HANDLE2UTF16Formatter {
+    fn default() -> Self {
+        Self::new_unchecked(Default::default())
     }
 }

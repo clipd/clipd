@@ -1,24 +1,42 @@
-use std::{collections::VecDeque, marker::PhantomData};
+use std::{collections::VecDeque, fmt::Debug};
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 
-use super::{strlen, wcslen, FormatFeature, Formatter};
+use super::{FormatFeature, Formatter};
 
-#[derive(Default)]
-pub struct UnicodeFormatter<T> {
+#[derive(Debug, Default)]
+pub struct UnicodeFormatter {
     feature: FormatFeature,
-    _mark: PhantomData<T>,
+    ends_with_zero: bool,
 }
 
-impl<T> UnicodeFormatter<T> {
-    fn fmt_string(&self, string: String) -> Result<String> {
+impl UnicodeFormatter {
+    pub fn ends_with_zero(mut self) -> Self {
+        self.ends_with_zero = true;
+        self
+    }
+}
+
+impl Formatter<String, String> for UnicodeFormatter {
+    fn new(feature: FormatFeature) -> Result<Self> {
+        Ok(Self {
+            feature,
+            ends_with_zero: false,
+        })
+    }
+
+    fn fmt(&self, text: &String) -> Result<String> {
         let feature = self.feature.expect()?;
 
         const CR: char = '\x0D';
         const LF: char = '\x0A';
 
         let mut deque: VecDeque<char> = VecDeque::new();
-        for char in string.chars() {
+        for char in text.chars() {
+            if char == '\0' {
+                break;
+            }
+
             if deque.is_empty() {
                 if char == LF && feature.contains(FormatFeature::TRIM_START_LF) {
                     continue;
@@ -50,90 +68,49 @@ impl<T> UnicodeFormatter<T> {
                 break;
             }
         }
-        deque.push_back('\0');
+        if self.ends_with_zero {
+            deque.push_back('\0');
+        }
         Ok(String::from_iter(deque))
-    }
-}
-
-impl Formatter<u8> for UnicodeFormatter<u8> {
-    fn new(feature: FormatFeature) -> Result<Self> {
-        Ok(Self {
-            feature,
-            _mark: PhantomData,
-        })
-    }
-
-    unsafe fn fmt(&self, ptr: *const u8) -> Result<Vec<u8>> {
-        self.feature.expect()?;
-
-        let len = strlen(ptr as *const _);
-        if len <= 0 {
-            bail!("Invalid str: {:?}", ptr)
-        }
-
-        let slice = std::slice::from_raw_parts(ptr, len);
-        let string = self.fmt_string(String::from_utf8(slice.to_vec())?)?;
-        Ok(Vec::from(string))
-    }
-}
-
-impl Formatter<u16> for UnicodeFormatter<u16> {
-    fn new(feature: FormatFeature) -> Result<Self> {
-        Ok(Self {
-            feature,
-            _mark: PhantomData,
-        })
-    }
-
-    unsafe fn fmt(&self, ptr: *const u16) -> Result<Vec<u16>> {
-        self.feature.expect()?;
-
-        let len = wcslen(ptr as *const _);
-        if len <= 0 {
-            bail!("Invalid str: {:?}", ptr)
-        }
-
-        let slice = std::slice::from_raw_parts(ptr, len);
-        let string = self.fmt_string(String::from_utf16(slice)?)?;
-        Ok(string.encode_utf16().collect::<Vec<u16>>())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::{FormatFeature, Formatter, UTF16Formatter, UTF8Formatter};
+    use super::super::{FormatFeature, Formatter, StringFormatter};
 
     fn test_fmt<S1, S2>(feature: FormatFeature, source: S1, expect: S2)
     where
         S1: AsRef<str> + std::fmt::Debug,
         S2: AsRef<str> + std::fmt::Debug,
     {
-        // UTF-8
         {
-            let formatter =
-                UTF8Formatter::new(feature).expect(&format!("Formatter with {:?}", feature));
-            let mut c_source = source.as_ref().to_string();
-            c_source.push('\0');
-            let mut c_expect = expect.as_ref().to_string();
-            c_expect.push('\0');
-            let fmt_result = unsafe { formatter.fmt(c_source.as_ptr()) }
-                .expect(&format!("fmt {:?} with {:?}", source, feature));
-            assert_eq!(fmt_result.as_slice(), c_expect.as_bytes());
+            let formatter = StringFormatter::new_unchecked(feature);
+            let source = source.as_ref().to_string();
+            let expect = expect.as_ref().to_string();
+            assert!(!source.ends_with('\0'));
+            assert!(!expect.ends_with('\0'));
+            let fmt_result = formatter.fmt_unckecked(&source);
+            assert_eq!(fmt_result, expect);
         }
 
-        // UTF-16
         {
-            let formatter =
-                UTF16Formatter::new(feature).expect(&format!("Formatter with {:?}", feature));
-            let mut c_source = source.as_ref().to_string();
-            c_source.push('\0');
-            let mut c_expect = expect.as_ref().to_string();
-            c_expect.push('\0');
-            let ptr = c_source.encode_utf16().collect::<Vec<u16>>().as_ptr();
-            let fmt_result = unsafe { formatter.fmt(ptr) }
-                .expect(&format!("fmt {:?} with {:?}", source, feature));
-            let u16_expect = c_expect.encode_utf16().collect::<Vec<u16>>();
-            assert_eq!(fmt_result.as_slice(), u16_expect.as_slice());
+            let source = source.as_ref().to_string();
+            let mut expect = expect.as_ref().to_string();
+            expect.push('\0');
+            let formatter = StringFormatter::new_unchecked(feature).ends_with_zero();
+            let fmt_result = formatter.fmt_unckecked(&source);
+            assert_eq!(fmt_result, expect);
+        }
+
+        {
+            let mut source = source.as_ref().to_string();
+            let mut expect = expect.as_ref().to_string();
+            source.push('\0');
+            expect.push('\0');
+            let formatter = StringFormatter::new_unchecked(feature).ends_with_zero();
+            let fmt_result = formatter.fmt_unckecked(&source);
+            assert_eq!(fmt_result, expect);
         }
     }
 
