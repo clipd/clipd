@@ -44,5 +44,11 @@ fn compile_res() {
     res.compile().unwrap();
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "linux")]
+fn compile_res() {
+    println!("cargo:rustc-link-lib=dylib=X11");
+    println!("cargo:rustc-link-lib=dylib=Xfixes");
+}
+
+#[cfg(target_os = "maco")]
 fn compile_res() {}

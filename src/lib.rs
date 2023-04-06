@@ -36,17 +36,20 @@ pub fn run(args: Args) -> Result<()> {
         .sub
         .unwrap_or(SubCommand::Run(RunArgs { daemon: false }));
 
+    if let SubCommand::Run(args) = &sub_cmd {
+        if let Err(e) = oal.run_clipd(args.daemon) {
+            log::error!("Error: {:?}", e);
+            return Err(e);
+        }
+        return Ok(());
+    }
+
     let controller = oal.service_controller()?;
     match sub_cmd {
         SubCommand::Install => {
             controller.install(vec![OsString::from("run"), OsString::from("--daemon")])?
         }
-        SubCommand::Run(args) => {
-            if let Err(e) = oal.run_clipd(args.daemon) {
-                log::error!("Error: {:?}", e);
-                return Err(e);
-            }
-        }
+        SubCommand::Run(_) => panic!(),
         SubCommand::Start => controller.start(vec![])?,
         SubCommand::Pause => controller.pause()?,
         SubCommand::Resume => controller.resume()?,
