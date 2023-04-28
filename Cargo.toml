@@ -32,6 +32,11 @@ windows-service = "0.6.0"
 x11-clipboard = "0.7.1"
 x11rb = { version = "0.10.0", features = ["xfixes"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc = "0.2.7"
+objc_id = "0.1.1"
+objc-foundation = "0.1.1"
+
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.1.8", features = ["derive"] }

@@ -1,3 +1,7 @@
+mod clipboard;
+mod fmt;
+mod service;
+
 use anyhow::Result;
 
 use super::OsAbstractionLayer;
@@ -8,11 +12,14 @@ pub struct MacOAL;
 
 impl OsAbstractionLayer for MacOAL {
     fn init(&mut self, _args: &crate::Args) -> Result<()> {
-        os_stub!()
+        Ok(())
     }
 
-    fn run_clipd(&self, _daemon: bool) -> Result<()> {
-        os_stub!()
+    fn run_clipd(&self, daemon: bool) -> Result<()> {
+        if daemon {
+            os_stub!()
+        }
+        service::ClipdService::new()?.run()
     }
 
     fn service_controller(&self) -> Result<Box<dyn super::SystemServiceController>> {
