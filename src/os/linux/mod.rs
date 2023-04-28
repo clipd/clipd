@@ -1,3 +1,5 @@
+mod service;
+
 use anyhow::Result;
 
 use super::OsAbstractionLayer;
@@ -8,11 +10,14 @@ pub struct LinuxOAL;
 
 impl OsAbstractionLayer for LinuxOAL {
     fn init(&mut self, _args: &crate::Args) -> Result<()> {
-        os_stub!()
+        Ok(())
     }
 
-    fn run_clipd(&self, _daemon: bool) -> Result<()> {
-        os_stub!()
+    fn run_clipd(&self, daemon: bool) -> Result<()> {
+        if daemon {
+            os_stub!()
+        }
+        service::ClipdService::default().run()
     }
 
     fn service_controller(&self) -> anyhow::Result<Box<dyn super::SystemServiceController>> {

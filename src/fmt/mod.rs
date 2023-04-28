@@ -1,11 +1,8 @@
-mod ascii;
 mod unicode;
 
-pub use ascii::*;
 use unicode::*;
 
-pub type UTF8Formatter = UnicodeFormatter<u8>;
-pub type UTF16Formatter = UnicodeFormatter<u16>;
+pub type StringFormatter = UnicodeFormatter;
 
 use anyhow::{bail, Result};
 
@@ -47,18 +44,17 @@ impl Default for FormatFeature {
     }
 }
 
-extern "C" {
-    /// Provided by libc or compiler_builtins.
-    fn strlen(s: *const i8) -> usize;
-    fn wcslen(s: *const i32) -> usize;
-}
-
-pub trait Formatter<T>: Sized {
+pub trait Formatter<S, R>: Sized + std::fmt::Debug
+where
+    S: std::fmt::Debug,
+{
     fn new(feature: FormatFeature) -> Result<Self>;
-
-    unsafe fn fmt_c_void(&self, ptr: *const std::ffi::c_void) -> Result<Vec<T>> {
-        self.fmt(ptr as *const T)
+    fn new_unchecked(feature: FormatFeature) -> Self {
+        Self::new(feature).expect(&format!("Formatter with {:?}", feature))
     }
 
-    unsafe fn fmt(&self, ptr: *const T) -> Result<Vec<T>>;
+    fn fmt(&self, text: &S) -> Result<R>;
+    fn fmt_unckecked(&self, text: &S) -> R {
+        Formatter::fmt(self, text).expect(&format!("{:?} fmt {:?}", self, text))
+    }
 }

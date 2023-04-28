@@ -16,8 +16,6 @@ pub fn start_tracing(
         EnvFilter::try_from_env("RUST_LOG").unwrap_or_else(|_| EnvFilter::new(level.as_str()));
     let formatting_layer = fmt::layer().compact().with_writer(std::io::stdout);
     let file_appender = rolling::never(std::env::temp_dir(), filename);
-    let (non_blocking_appender, guard) = tracing_appender::non_blocking(file_appender);
-
     let local_time = OffsetTime::new(
         UtcOffset::current_local_offset()?,
         format_description::parse(
@@ -25,6 +23,8 @@ pub fn start_tracing(
         )
         .unwrap(),
     );
+    let (non_blocking_appender, guard) = tracing_appender::non_blocking(file_appender);
+
     let file_layer = fmt::layer()
         .with_ansi(false)
         .with_thread_ids(true)
