@@ -50,5 +50,5 @@ fn compile_res() {
     println!("cargo:rustc-link-lib=dylib=Xfixes");
 }
 
-#[cfg(target_os = "maco")]
+#[cfg(target_os = "macos")]
 fn compile_res() {}
