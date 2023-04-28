@@ -23,7 +23,7 @@
 - [ ] Android
 - [ ] iOS
 - [ ] Linux <https://github.com/clipd/clipd/pull/1>
-- [ ] macOS (x86_64 / arm64)
+- [ ] macOS <https://github.com/clipd/clipd/pull/2>
 - [ ] Windows (arm64)
 
 ## License
