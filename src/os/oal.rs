@@ -46,7 +46,9 @@ impl OAL {
     }
 
     #[cfg(target_os = "macos")]
-    pub fn init(_args: &Args) -> Result<Box<dyn OsAbstractionLayer>> {
-        os_stub!()
+    pub fn init(args: &Args) -> Result<Box<dyn OsAbstractionLayer>> {
+        let mut oal = Box::new(super::macos::MacOAL::default());
+        oal.init(args)?;
+        Ok(oal)
     }
 }

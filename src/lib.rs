@@ -15,6 +15,10 @@ use sys_locale::get_locale;
 use sysinfo::{RefreshKind, System, SystemExt};
 pub use util::*;
 
+#[cfg(target_os = "macos")]
+#[macro_use]
+extern crate objc;
+
 pub const SERVICE_NAME: &'static str = "clipd";
 
 pub fn run(args: Args) -> Result<()> {
