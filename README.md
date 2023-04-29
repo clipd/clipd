@@ -14,17 +14,7 @@
 
 ## 安装
 
-### Windows (x86_64)
-
 [Releases Page](https://github.com/clipd/clipd/releases/latest)
-
-### 其它平台
-
-- [ ] Android
-- [ ] iOS
-- [ ] Linux <https://github.com/clipd/clipd/pull/1>
-- [ ] macOS <https://github.com/clipd/clipd/pull/2>
-- [ ] Windows (arm64)
 
 ## License
 

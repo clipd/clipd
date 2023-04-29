@@ -1,21 +1,19 @@
 name: Build CI
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
 
 jobs:
-  build:
-    name: Build
-    runs-on: ${{ matrix.os }}
+  build-linux:
+    name: Linux
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        build: [windows]
-        include:
-          - build: windows
-            os: windows-2022
-            rust: stable-x86_64-pc-windows-msvc
-            target: x86_64-pc-windows-msvc
+        target: [x86_64-unknown-linux-gnu]
       fail-fast: false
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v2
@@ -23,18 +21,140 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: stable
           profile: minimal
           override: true
           target: ${{ matrix.target }}
 
-      - name: Build binary
-        run: cargo build --verbose --release --target ${{ matrix.target }}
-        env:
-          RUST_BACKTRACE: 1
-      
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
+      - name: Build target
+        uses: actions-rs/cargo@v1
         with:
-          name: ${{ matrix.target }}
-          path: ${{ github.workspace }}\target\${{ matrix.target }}\release\clipd.exe
+          use-cross: true
+          command: build
+          args: --release --target ${{ matrix.target }}
+
+      - name: Strip binary
+        run: strip "target/${{ matrix.target }}/release/clipd"
+
+      - name: 'Get Previous tag'
+        id: previous_tag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        with:
+          fallback: 'v0.0.0'
+
+      - name: Package
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czvf ../../../clipd-${{ matrix.target }}-${{ steps.previous_tag.outputs.tag }}.tar.gz clipd
+          cd -
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+            tag_name: ${{ steps.previous_tag.outputs.tag }}
+            files: 'clipd*'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-win:
+    name: Windows
+    runs-on: windows-2022
+    strategy:
+      matrix:
+        target: [aarch64-pc-windows-msvc, x86_64-pc-windows-msvc]
+      fail-fast: false
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+          target: ${{ matrix.target }}
+
+      - name: Build target
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --target ${{ matrix.target }}
+
+      - name: 'Get Previous tag'
+        id: previous_tagaaa 
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        with:
+          fallback: 'v0.0.0'
+
+      - name: Package
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          7z a "clipd-${{ matrix.target }}-${{ steps.previous_tag.outputs.tag }}.7z" clipd.exe
+          cd -
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+            tag_name: ${{ steps.previous_tag.outputs.tag }}
+            files: 'target/${{ matrix.target }}/release/clipd*.7z'
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-mac:
+    name: macOS
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
+      fail-fast: false
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+          target: ${{ matrix.target }}
+
+      - name: Build target
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --target ${{ matrix.target }}
+
+      - name: 'Get Previous tag'
+        id: previous_tag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        with:
+          fallback: 'v0.0.0'
+
+      - name: Package
+        shell: bash
+        run: |
+          strip "target/${{ matrix.target }}/release/clipd"
+          cd target/${{ matrix.target }}/release
+          tar czvf ../../../clipd-${{ matrix.target }}-${{ steps.previous_tag.outputs.tag }}.tar.gz clipd
+          cd -
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+            tag_name: ${{ steps.previous_tag.outputs.tag }}
+            files: 'clipd*'
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
