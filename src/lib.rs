@@ -99,7 +99,10 @@ fn format_version() -> String {
     use std::env::consts::*;
     let refresh_kind = RefreshKind::new();
     let sys = System::new_with_specifics(refresh_kind);
-    let mut str = format!("{} revision {} • {}", VERSION, GIT_COMMIT_ID, BUILD_TIME);
+    let mut str = format!(
+        "{} revision {} • {}",
+        GIT_DESCRIBE, GIT_COMMIT_ID, BUILD_TIME
+    );
 
     str.push('\n');
 

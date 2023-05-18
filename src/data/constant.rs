@@ -10,5 +10,6 @@ macro_rules! constant {
 constant! {
     BUILD_TIME => "BUILD_TIME",
     GIT_COMMIT_ID => "GIT_COMMIT_ID",
+    GIT_DESCRIBE => "GIT_DESCRIBE",
     VERSION => "VERSION",
 }

@@ -1,6 +1,7 @@
-use std::{env, fs::File, io::Write, path::Path, process::Command};
+use std::{env, fs::File, io::Write, path::Path};
 
 use chrono::Utc;
+use cmd_lib::run_fun;
 
 fn get_build_time() -> String {
     let utc = Utc::now();
@@ -8,12 +9,13 @@ fn get_build_time() -> String {
 }
 
 fn get_git_commit_id() -> String {
-    let output = Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .expect("Failed to read stdout");
-    String::from_utf8(output.stdout).expect("Failed to read stdout")
+    run_fun!(git rev-parse --short HEAD).expect("Failed to get git commit id")
 }
+
+fn get_git_describe() -> String {
+    run_fun!(git describe --tags --always --dirty="-dev").expect("Failed to get git describe")
+}
+
 fn get_version() -> String {
     env::var("CARGO_PKG_VERSION").expect("Failed to get CARGO_PKG_VERSION")
 }
@@ -21,6 +23,7 @@ fn get_version() -> String {
 fn main() {
     add_const("BUILD_TIME", get_build_time);
     add_const("GIT_COMMIT_ID", get_git_commit_id);
+    add_const("GIT_DESCRIBE", get_git_describe);
     add_const("VERSION", get_version);
     compile_res();
 }
