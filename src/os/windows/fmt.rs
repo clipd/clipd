@@ -2,19 +2,22 @@ use anyhow::{bail, Context, Result};
 use windows::{
     core::PCWSTR,
     Win32::Foundation::*,
-    Win32::System::{
-        DataExchange::{
-            AddClipboardFormatListener, CloseClipboard, EmptyClipboard, GetClipboardData,
-            GetClipboardOwner, IsClipboardFormatAvailable, OpenClipboard,
-            RemoveClipboardFormatListener, SetClipboardData,
+    Win32::{
+        System::{
+            DataExchange::{
+                AddClipboardFormatListener, CloseClipboard, EmptyClipboard, GetClipboardData,
+                GetClipboardOwner, IsClipboardFormatAvailable, OpenClipboard,
+                RemoveClipboardFormatListener, SetClipboardData,
+            },
+            Memory::{GlobalLock, GlobalUnlock},
+            Ole::{CF_HDROP, CF_LOCALE, CF_UNICODETEXT, CLIPBOARD_FORMAT},
         },
-        Memory::{GlobalLock, GlobalUnlock},
-        Ole::{CF_LOCALE, CF_UNICODETEXT, CLIPBOARD_FORMAT},
+        UI::Shell::{DragQueryFileW, HDROP},
     },
 };
 
 use crate::{
-    fmt::{FormatFeature, Formatter, StringFormatter},
+    fmt::{FormatFeature, FormatResult, Formatter, StringFormatter},
     os::windows::mem::HandleGuard,
     ExpectWithTracing,
 };
@@ -47,9 +50,35 @@ impl ClipboardFormatter {
 
         let clipboard = Clipboard::open(self.window)?;
 
-        let text = clipboard.get_text(CF_UNICODETEXT)?;
-        let fmt_text = self.utf16_formatter.fmt(&text)?;
-        clipboard.set_text(CF_UNICODETEXT, fmt_text)?;
+        if clipboard.is_available(CF_HDROP) {
+            let hdrop = HDROP(clipboard.get_data(CF_HDROP)?.0);
+            let count = DragQueryFileW(hdrop, 0xFFFFFFFF, None);
+            for i in 0..count {
+                let buf_size = DragQueryFileW(hdrop, i, None);
+                assert!(buf_size > 0);
+                let mut buf = vec![0; buf_size as usize + 1];
+                let buf = buf.as_mut();
+                assert!(DragQueryFileW(hdrop, i, Some(buf)) == buf_size);
+                log::trace!(
+                    "Ignore format file content: {:?}",
+                    String::from_utf16(buf).unwrap()
+                );
+            }
+            return Ok(());
+        }
+
+        if !clipboard.is_available(CF_UNICODETEXT) {
+            log::debug!("The clipboard content format is not {:?}", CF_UNICODETEXT);
+            return Ok(());
+        }
+
+        let text = clipboard.get_data(CF_UNICODETEXT)?;
+        let fmt_result = self.utf16_formatter.fmt(&text)?;
+        if fmt_result.has_changed() {
+            clipboard.set_text(CF_UNICODETEXT, fmt_result.data)?;
+        } else {
+            log::debug!("No text need formatting");
+        }
 
         Ok(())
     }
@@ -72,11 +101,12 @@ impl Clipboard {
         bail!("OpenCliboard failed")
     }
 
-    unsafe fn get_text(&self, format: CLIPBOARD_FORMAT) -> Result<HANDLE> {
-        let format = format.0 as _;
-        if IsClipboardFormatAvailable(format) == FALSE {
-            bail!("NotAvailable: {:?}", GetLastError());
-        }
+    unsafe fn is_available(&self, format: CLIPBOARD_FORMAT) -> bool {
+        IsClipboardFormatAvailable(format.0 as _) == TRUE
+    }
+
+    unsafe fn get_data(&self, cf: CLIPBOARD_FORMAT) -> Result<HANDLE> {
+        assert!(self.is_available(cf), "Not available format: {:?}", cf);
 
         let locale = match GetClipboardData(CF_LOCALE.0 as _) {
             Ok(handle) => *(handle.0 as *const u32),
@@ -85,13 +115,9 @@ impl Clipboard {
                 0
             }
         };
-        log::debug!(
-            "GetClipboardData({:?}) with Locale 0x{:04x}",
-            format,
-            locale
-        );
+        log::debug!("GetClipboardData({:?}) with Locale 0x{:04x}", cf, locale);
 
-        Ok(GetClipboardData(format)?)
+        Ok(GetClipboardData(cf.0 as _)?)
     }
 
     unsafe fn set_text<T>(&self, format: CLIPBOARD_FORMAT, text: Vec<T>) -> Result<()> {
@@ -129,21 +155,17 @@ impl Formatter<HANDLE, Vec<u16>> for HANDLE2UTF16Formatter {
         })
     }
 
-    fn fmt(&self, text: &HANDLE) -> Result<Vec<u16>> {
+    fn fmt(&self, text: &HANDLE) -> Result<FormatResult<Vec<u16>>> {
         let hmem = text.0;
         let ptr = unsafe { GlobalLock(hmem) };
         let text = PCWSTR::from_raw(ptr as _);
-        unsafe {
-            log::trace!("{:?}", text.to_string());
-        }
         log::trace!("{:?}", self.inner);
         let text = unsafe { text.to_string()? };
-        let fmt_text = self.inner.fmt(&text)?;
-        log::trace!("{:?}", fmt_text);
+        log::trace!("{:?}", text);
+        let fmt_result = self.inner.fmt(&text)?;
+        log::trace!("{:?}", fmt_result);
         unsafe { GlobalUnlock(hmem) };
-        let b = fmt_text.encode_utf16().collect::<Vec<u16>>();
-        log::trace!("{:?}", b);
-        Ok(b)
+        Ok(fmt_result.map(|s| s.encode_utf16().collect()))
     }
 }
 

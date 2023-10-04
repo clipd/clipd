@@ -2,7 +2,7 @@ use std::{collections::VecDeque, fmt::Debug};
 
 use anyhow::Result;
 
-use super::{FormatFeature, Formatter};
+use super::{FormatFeature, FormatResult, Formatter};
 
 #[derive(Debug, Default)]
 pub struct UnicodeFormatter {
@@ -25,8 +25,9 @@ impl Formatter<String, String> for UnicodeFormatter {
         })
     }
 
-    fn fmt(&self, text: &String) -> Result<String> {
+    fn fmt(&self, text: &String) -> Result<FormatResult<String>> {
         let feature = self.feature.expect()?;
+        let mut matched_feature = FormatFeature::empty();
 
         const CR: char = '\x0D';
         const LF: char = '\x0A';
@@ -39,16 +40,19 @@ impl Formatter<String, String> for UnicodeFormatter {
 
             if deque.is_empty() {
                 if char == LF && feature.contains(FormatFeature::TRIM_START_LF) {
+                    matched_feature = matched_feature.union(FormatFeature::TRIM_START_LF);
                     continue;
                 } else if char.is_whitespace()
                     && feature.contains(FormatFeature::TRIM_START_WHITESPACE)
                 {
+                    matched_feature = matched_feature.union(FormatFeature::TRIM_START_WHITESPACE);
                     continue;
                 }
             }
 
             if char == CR {
                 if feature.contains(FormatFeature::TRIM_CR) {
+                    matched_feature = matched_feature.union(FormatFeature::TRIM_CR);
                     continue;
                 }
             }
@@ -61,8 +65,10 @@ impl Formatter<String, String> for UnicodeFormatter {
                 None => break,
             };
             if byte == LF && feature.contains(FormatFeature::TRIM_END_LF) {
+                matched_feature = matched_feature.union(FormatFeature::TRIM_END_LF);
                 deque.pop_back();
             } else if byte.is_whitespace() && feature.contains(FormatFeature::TRIM_END_WHITESPACE) {
+                matched_feature = matched_feature.union(FormatFeature::TRIM_END_WHITESPACE);
                 deque.pop_back();
             } else {
                 break;
@@ -71,7 +77,7 @@ impl Formatter<String, String> for UnicodeFormatter {
         if self.ends_with_zero {
             deque.push_back('\0');
         }
-        Ok(String::from_iter(deque))
+        Ok(FormatResult::new(String::from_iter(deque), matched_feature))
     }
 }
 
@@ -91,16 +97,19 @@ mod tests {
             assert!(!source.ends_with('\0'));
             assert!(!expect.ends_with('\0'));
             let fmt_result = formatter.fmt_unckecked(&source);
-            assert_eq!(fmt_result, expect);
+            assert_eq!(fmt_result.data, expect);
+            assert_ne!(fmt_result.has_changed(), fmt_result.data.eq(&source))
         }
 
         {
-            let source = source.as_ref().to_string();
+            let mut source = source.as_ref().to_string();
             let mut expect = expect.as_ref().to_string();
             expect.push('\0');
             let formatter = StringFormatter::new_unchecked(feature).ends_with_zero();
             let fmt_result = formatter.fmt_unckecked(&source);
-            assert_eq!(fmt_result, expect);
+            assert_eq!(fmt_result.data, expect);
+            source.push('\0');
+            assert_ne!(fmt_result.has_changed(), fmt_result.data.eq(&source))
         }
 
         {
@@ -110,7 +119,8 @@ mod tests {
             expect.push('\0');
             let formatter = StringFormatter::new_unchecked(feature).ends_with_zero();
             let fmt_result = formatter.fmt_unckecked(&source);
-            assert_eq!(fmt_result, expect);
+            assert_eq!(fmt_result.data, expect);
+            assert_ne!(fmt_result.has_changed(), fmt_result.data.eq(&source))
         }
     }
 

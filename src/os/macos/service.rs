@@ -37,8 +37,11 @@ impl ClipdService {
         if !formatter.is_need_fmt(&text) {
             return Ok(());
         }
-        let fmt_text = formatter.fmt(&text)?;
-        clipboard.set_text(fmt_text)?;
+        let fmt_result = formatter.fmt(&text)?;
+        log::trace!("{:?}", fmt_result);
+        if fmt_result.has_changed() {
+            clipboard.set_text(fmt_result.data)?;
+        }
         Ok(())
     }
 }

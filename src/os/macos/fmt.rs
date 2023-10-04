@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use anyhow::Result;
 
-use crate::fmt::{FormatFeature, Formatter, StringFormatter};
+use crate::fmt::{FormatFeature, FormatResult, Formatter, StringFormatter};
 
 #[derive(Debug, Default)]
 pub struct OSXClipboardFormatter {
@@ -18,10 +18,10 @@ impl Formatter<String, String> for OSXClipboardFormatter {
         })
     }
 
-    fn fmt(&self, text: &String) -> Result<String> {
+    fn fmt(&self, text: &String) -> Result<FormatResult<String>> {
         let mut last = self.last.borrow_mut();
-        let fmt_text = self.inner.fmt(text)?;
-        Ok(last.insert(fmt_text).clone())
+        let fmt_result = self.inner.fmt(text)?;
+        Ok(fmt_result.map(|s| last.insert(s).clone()))
     }
 }
 

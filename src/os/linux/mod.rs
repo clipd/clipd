@@ -1,4 +1,5 @@
 mod service;
+mod clipboard;
 
 use anyhow::Result;
 

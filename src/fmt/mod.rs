@@ -44,6 +44,29 @@ impl Default for FormatFeature {
     }
 }
 
+#[derive(Debug)]
+pub struct FormatResult<S> {
+    pub data: S,
+    matched_feature: FormatFeature,
+}
+
+impl<S> FormatResult<S> {
+    pub fn new(data: S, matched_feature: FormatFeature) -> Self {
+        Self {
+            data,
+            matched_feature,
+        }
+    }
+
+    pub fn has_changed(&self) -> bool {
+        return !self.matched_feature.is_empty();
+    }
+
+    pub fn map<U, F: FnOnce(S) -> U>(self, op: F) -> FormatResult<U> {
+        FormatResult::new(op(self.data), self.matched_feature)
+    }
+}
+
 pub trait Formatter<S, R>: Sized + std::fmt::Debug
 where
     S: std::fmt::Debug,
@@ -53,8 +76,8 @@ where
         Self::new(feature).expect(&format!("Formatter with {:?}", feature))
     }
 
-    fn fmt(&self, text: &S) -> Result<R>;
-    fn fmt_unckecked(&self, text: &S) -> R {
+    fn fmt(&self, text: &S) -> Result<FormatResult<R>>;
+    fn fmt_unckecked(&self, text: &S) -> FormatResult<R> {
         Formatter::fmt(self, text).expect(&format!("{:?} fmt {:?}", self, text))
     }
 }
